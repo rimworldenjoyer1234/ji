@@ -24,15 +24,22 @@ target_include_directories(cpujitter
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/jitterentropy/jitterentropy.h")
-    message(STATUS "Using vendored jitterentropy headers from external/jitterentropy")
-    target_include_directories(cpujitter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/external/jitterentropy)
+set(CPUJITTER_JENT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/external/jitterentropy")
+set(CPUJITTER_JENT_HEADER "${CPUJITTER_JENT_DIR}/jitterentropy.h")
+file(GLOB CPUJITTER_JENT_SOURCES CONFIGURE_DEPENDS "${CPUJITTER_JENT_DIR}/*.c")
+
+if (EXISTS "${CPUJITTER_JENT_HEADER}" AND CPUJITTER_JENT_SOURCES)
+    message(STATUS "Using vendored jitterentropy from external/jitterentropy")
+    add_library(cpujitter_jent STATIC ${CPUJITTER_JENT_SOURCES})
+    target_include_directories(cpujitter_jent PUBLIC ${CPUJITTER_JENT_DIR})
+    target_include_directories(cpujitter PRIVATE ${CPUJITTER_JENT_DIR})
+    target_link_libraries(cpujitter PRIVATE cpujitter_jent)
 else()
     if (CPUJITTER_ENABLE_MOCK_BACKEND)
-        message(WARNING "Building with NON-PRODUCTION mock backend (jitterentropy headers not found).")
+        message(WARNING "Building with NON-PRODUCTION mock backend (vendored jitterentropy header+sources not found in external/jitterentropy; run scripts/fetch_external_deps.sh).")
         target_compile_definitions(cpujitter PRIVATE CPUJITTER_ENABLE_MOCK_BACKEND=1)
     else()
-        message(FATAL_ERROR "jitterentropy headers not found and CPUJITTER_ENABLE_MOCK_BACKEND=OFF")
+        message(FATAL_ERROR "vendored jitterentropy not found (expected jitterentropy.h and *.c in external/jitterentropy) and CPUJITTER_ENABLE_MOCK_BACKEND=OFF")
     endif()
 endif()
 

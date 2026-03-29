@@ -40,7 +40,7 @@ Key API functions:
 ### Backend integration model
 `src/entropy_backend.c` integrates with jitterentropy public API when `jitterentropy.h` is available (`jent_entropy_init_ex`, collector alloc/free, `jent_read_entropy`).
 
-If jitterentropy headers are missing, build can use an explicit **NON-PRODUCTION** mock backend (`CPUJITTER_ENABLE_MOCK_BACKEND=ON`) and emits a clear CMake warning.
+If vendored jitterentropy (`external/jitterentropy/jitterentropy.h` + `external/jitterentropy/*.c`) is missing, build can use an explicit **NON-PRODUCTION** mock backend (`CPUJITTER_ENABLE_MOCK_BACKEND=ON`) and emits a clear CMake warning.
 
 This keeps jitterentropy-specific details internal and out of public headers.
 
