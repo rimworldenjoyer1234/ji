@@ -1,1 +1,6 @@
 
+cd ~/Documents/autojitter
+rm -rf build install
+cmake -S . -B build -DJENT_ROOT=$HOME/Documents/jitterentropy-library
+cmake --build build -j
+cmake --install build --prefix "$HOME/Documents/autojitter/install"
