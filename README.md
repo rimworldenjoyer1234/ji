@@ -47,12 +47,16 @@ This keeps jitterentropy-specific details internal and out of public headers.
 
 ## Startup lifecycle
 1. Detect current platform (`os`, `arch`, `cpu_vendor`).
-2. If not forcing a specific profile, try local cache file first.
-3. If cache is missing/invalid/fails smoke test, parse `profiles/index.json`.
-4. Deterministically select best profile using score `(os, arch, cpu_vendor)` with stable tie-break by profile id.
-5. Apply selected profile and run smoke test.
-6. If smoke test fails, run lightweight recalibration candidate sweep.
-7. On success, write validated profile to cache.
+2. If not forcing a specific profile, try local validated cache profile first.
+3. If cache profile exists, apply it and run smoke test.
+4. If cache path fails, parse `profiles/index.json`.
+5. Deterministically select bundled profile (or requested profile) and run smoke test.
+6. If bundled profile path fails, run lightweight recalibration over a small candidate matrix (no heavy qualification).
+7. On success, persist local validated cache profile and keep reusable backend/context initialized.
+8. Expose selected runtime config and status JSON via public API.
+
+### Debug logging hook
+Set `CPUJITTER_LOG=1` to emit lifecycle logs to `stderr` during init/recalibration decisions.
 
 ## Fair die rolling
 `cpujitter_roll_die` uses rejection sampling:

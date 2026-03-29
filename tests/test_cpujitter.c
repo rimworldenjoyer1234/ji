@@ -45,6 +45,46 @@ static int test_init_and_bytes(void) {
     return 0;
 }
 
+static int test_cache_then_reuse(void) {
+    cpujitter_ctx *ctx = NULL;
+    cpujitter_err err;
+    cpujitter_runtime_config cfg;
+    char profiles[512];
+    char cache[256];
+
+    paths(profiles, sizeof(profiles), cache, sizeof(cache));
+    (void)remove(cache);
+
+    err = cpujitter_init(&ctx, profiles, cache);
+    if (err != CPUJITTER_OK) {
+        fprintf(stderr, "first init failed: %s\n", cpujitter_strerror(err));
+        return 1;
+    }
+    err = cpujitter_get_runtime_config(ctx, &cfg);
+    if (err != CPUJITTER_OK || (cfg.source != 2 && cfg.source != 3)) {
+        fprintf(stderr, "first init source unexpected: %d\n", cfg.source);
+        cpujitter_shutdown(ctx);
+        return 1;
+    }
+    cpujitter_shutdown(ctx);
+
+    ctx = NULL;
+    err = cpujitter_init(&ctx, profiles, cache);
+    if (err != CPUJITTER_OK) {
+        fprintf(stderr, "second init failed: %s\n", cpujitter_strerror(err));
+        return 1;
+    }
+    err = cpujitter_get_runtime_config(ctx, &cfg);
+    if (err != CPUJITTER_OK || cfg.source != 1) {
+        fprintf(stderr, "second init did not use cache source: %d\n", cfg.source);
+        cpujitter_shutdown(ctx);
+        return 1;
+    }
+
+    cpujitter_shutdown(ctx);
+    return 0;
+}
+
 static int test_die_roll_range(void) {
     cpujitter_ctx *ctx = NULL;
     cpujitter_err err;
@@ -98,11 +138,23 @@ static int test_status_json(void) {
     return 0;
 }
 
+static int test_invalid_args(void) {
+    cpujitter_err err;
+    err = cpujitter_init(NULL, "profiles/index.json", "cache/local.json");
+    if (err != CPUJITTER_ERR_INVALID_ARG) {
+        fprintf(stderr, "expected invalid arg from init\n");
+        return 1;
+    }
+    return 0;
+}
+
 int main(void) {
     int failed = 0;
     failed |= test_init_and_bytes();
+    failed |= test_cache_then_reuse();
     failed |= test_die_roll_range();
     failed |= test_status_json();
+    failed |= test_invalid_args();
 
     if (failed) {
         fprintf(stderr, "Tests failed\n");

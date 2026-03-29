@@ -1,21 +1,122 @@
 #include "cpujitter/cpujitter.h"
 #include "cpujitter_internal.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define MAX_PROFILES 64
 
+static int cpujitter_log_enabled(void) {
+    const char *v = getenv("CPUJITTER_LOG");
+    return v && v[0] != '\0' && strcmp(v, "0") != 0;
+}
+
+static void cpujitter_log(const char *fmt, ...) {
+    va_list ap;
+    if (!cpujitter_log_enabled()) {
+        return;
+    }
+    va_start(ap, fmt);
+    fprintf(stderr, "[cpujitter] ");
+    vfprintf(stderr, fmt, ap);
+    fprintf(stderr, "\n");
+    va_end(ap);
+}
+
+static void build_default_profile(const cpujitter_platform_info *platform, profile_entry *out) {
+    if (!platform || !out) {
+        return;
+    }
+    memset(out, 0, sizeof(*out));
+    snprintf(out->id, sizeof(out->id), "default-%.24s-%.24s", platform->os, platform->arch);
+    snprintf(out->os, sizeof(out->os), "%s", platform->os);
+    snprintf(out->arch, sizeof(out->arch), "%s", platform->arch);
+    snprintf(out->cpu_vendor, sizeof(out->cpu_vendor), "%s", platform->cpu_vendor);
+    out->osr = 1;
+    out->mem_blocks = 64;
+    out->mem_block_size = 64;
+    out->smoke_bytes = 32;
+}
+
+static cpujitter_err init_from_cache(cpujitter_ctx *ctx, int *out_used_cache) {
+    profile_entry cache_entry;
+    cpujitter_err err;
+
+    if (!ctx || !out_used_cache) {
+        return CPUJITTER_ERR_INVALID_ARG;
+    }
+    *out_used_cache = 0;
+
+    err = cpujitter_cache_load(ctx->cache_path, &cache_entry);
+    if (err != CPUJITTER_OK) {
+        cpujitter_log("no usable cache at %s (%s)", ctx->cache_path, cpujitter_strerror(err));
+        return CPUJITTER_OK;
+    }
+
+    if (strcmp(cache_entry.os, ctx->platform.os) != 0 || strcmp(cache_entry.arch, ctx->platform.arch) != 0) {
+        cpujitter_log("cache profile platform mismatch (cache=%s/%s local=%s/%s)",
+                      cache_entry.os,
+                      cache_entry.arch,
+                      ctx->platform.os,
+                      ctx->platform.arch);
+        return CPUJITTER_OK;
+    }
+
+    err = cpujitter_apply_profile(ctx, &cache_entry, 1);
+    if (err != CPUJITTER_OK) {
+        cpujitter_log("cached profile failed smoke test (%s), continuing", cpujitter_strerror(err));
+        return CPUJITTER_OK;
+    }
+
+    *out_used_cache = 1;
+    cpujitter_log("using cached validated profile '%s'", cache_entry.id);
+    return CPUJITTER_OK;
+}
+
+static cpujitter_err init_from_bundled_profiles(cpujitter_ctx *ctx,
+                                                const char *force_profile_id,
+                                                profile_entry *out_selected) {
+    profile_entry entries[MAX_PROFILES];
+    size_t count = 0;
+    cpujitter_err err;
+
+    if (!ctx || !out_selected) {
+        return CPUJITTER_ERR_INVALID_ARG;
+    }
+
+    err = cpujitter_profiles_load(ctx->profiles_index_path, entries, MAX_PROFILES, &count);
+    if (err != CPUJITTER_OK) {
+        cpujitter_log("failed loading profile index '%s' (%s)",
+                      ctx->profiles_index_path,
+                      cpujitter_strerror(err));
+        return err;
+    }
+
+    if (force_profile_id) {
+        err = cpujitter_profiles_find_by_id(entries, count, force_profile_id, out_selected);
+    } else {
+        err = cpujitter_profiles_select_best(entries, count, &ctx->platform, out_selected);
+    }
+    if (err != CPUJITTER_OK) {
+        cpujitter_log("no bundled profile selected (%s)", cpujitter_strerror(err));
+        return err;
+    }
+
+    cpujitter_log("selected bundled profile '%s'", out_selected->id);
+    return CPUJITTER_OK;
+}
+
 static cpujitter_err init_common(cpujitter_ctx **out_ctx,
                                  const char *profiles_index_path,
                                  const char *cache_path,
                                  const char *force_profile_id) {
     cpujitter_ctx *ctx;
-    profile_entry entries[MAX_PROFILES];
-    size_t count = 0;
     profile_entry selected;
+    profile_entry tuned;
     cpujitter_err err;
+    int used_cache = 0;
 
     if (!out_ctx || !profiles_index_path || !cache_path) {
         return CPUJITTER_ERR_INVALID_ARG;
@@ -30,49 +131,55 @@ static cpujitter_err init_common(cpujitter_ctx **out_ctx,
     cpujitter_detect_platform(&ctx->platform);
     snprintf(ctx->profiles_index_path, sizeof(ctx->profiles_index_path), "%s", profiles_index_path);
     snprintf(ctx->cache_path, sizeof(ctx->cache_path), "%s", cache_path);
+    cpujitter_log("init platform os=%s arch=%s cpu_vendor=%s",
+                  ctx->platform.os,
+                  ctx->platform.arch,
+                  ctx->platform.cpu_vendor);
 
     if (!force_profile_id) {
-        err = cpujitter_cache_load(ctx->cache_path, &selected);
-        if (err == CPUJITTER_OK) {
-            if (strcmp(selected.os, ctx->platform.os) == 0 && strcmp(selected.arch, ctx->platform.arch) == 0) {
-                err = cpujitter_apply_profile(ctx, &selected, 1);
-                if (err == CPUJITTER_OK) {
-                    *out_ctx = ctx;
-                    return CPUJITTER_OK;
-                }
-            }
-        }
-    }
-
-    err = cpujitter_profiles_load(ctx->profiles_index_path, entries, MAX_PROFILES, &count);
-    if (err != CPUJITTER_OK) {
-        free(ctx);
-        return err;
-    }
-
-    if (force_profile_id) {
-        err = cpujitter_profiles_find_by_id(entries, count, force_profile_id, &selected);
-    } else {
-        err = cpujitter_profiles_select_best(entries, count, &ctx->platform, &selected);
-    }
-    if (err != CPUJITTER_OK) {
-        free(ctx);
-        return err;
-    }
-
-    err = cpujitter_apply_profile(ctx, &selected, 2);
-    if (err != CPUJITTER_OK) {
-        profile_entry tuned;
-        err = cpujitter_try_recalibrate(ctx, &selected, &tuned);
+        err = init_from_cache(ctx, &used_cache);
         if (err != CPUJITTER_OK) {
-            cpujitter_backend_shutdown(ctx);
             free(ctx);
             return err;
         }
-        cpujitter_cache_save(ctx->cache_path, &tuned, &ctx->platform);
-    } else {
-        cpujitter_cache_save(ctx->cache_path, &selected, &ctx->platform);
+        if (used_cache) {
+            *out_ctx = ctx;
+            return CPUJITTER_OK;
+        }
     }
+
+    err = init_from_bundled_profiles(ctx, force_profile_id, &selected);
+    if (err == CPUJITTER_OK) {
+        err = cpujitter_apply_profile(ctx, &selected, 2);
+        if (err == CPUJITTER_OK) {
+            (void)cpujitter_cache_save(ctx->cache_path, &selected, &ctx->platform);
+            cpujitter_log("bundled profile accepted and cached: %s", selected.id);
+            *out_ctx = ctx;
+            return CPUJITTER_OK;
+        }
+        cpujitter_log("bundled profile failed smoke test: %s", cpujitter_strerror(err));
+    } else if (err != CPUJITTER_ERR_NO_PROFILE && !force_profile_id) {
+        free(ctx);
+        return err;
+    }
+
+    /* Lightweight fallback only (small matrix in recalibrate.c). */
+    if (force_profile_id) {
+        selected = (profile_entry){0};
+        build_default_profile(&ctx->platform, &selected);
+    } else if (err == CPUJITTER_ERR_NO_PROFILE) {
+        build_default_profile(&ctx->platform, &selected);
+    }
+
+    err = cpujitter_try_recalibrate(ctx, &selected, &tuned);
+    if (err != CPUJITTER_OK) {
+        cpujitter_backend_shutdown(ctx);
+        free(ctx);
+        return err;
+    }
+
+    (void)cpujitter_cache_save(ctx->cache_path, &tuned, &ctx->platform);
+    cpujitter_log("recalibration succeeded and cached profile '%s'", tuned.id);
 
     *out_ctx = ctx;
     return CPUJITTER_OK;
@@ -100,7 +207,11 @@ cpujitter_err cpujitter_recalibrate(cpujitter_ctx *ctx) {
         return CPUJITTER_ERR_INVALID_ARG;
     }
 
-    snprintf(base.id, sizeof(base.id), "%s-recal-base", ctx->runtime.profile_id[0] ? ctx->runtime.profile_id : "runtime");
+    memset(&base, 0, sizeof(base));
+    snprintf(base.id,
+             sizeof(base.id),
+             "%.47s-recal-base",
+             ctx->runtime.profile_id[0] ? ctx->runtime.profile_id : "runtime");
     snprintf(base.os, sizeof(base.os), "%s", ctx->platform.os);
     snprintf(base.arch, sizeof(base.arch), "%s", ctx->platform.arch);
     snprintf(base.cpu_vendor, sizeof(base.cpu_vendor), "%s", ctx->platform.cpu_vendor);
