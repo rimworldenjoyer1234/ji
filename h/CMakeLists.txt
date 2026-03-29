@@ -51,11 +51,14 @@ install(TARGETS autotune hello
 )
 
 install(CODE [[
+    message(STATUS "Starting autojitter calibration...")
     execute_process(
         COMMAND "${CMAKE_INSTALL_PREFIX}/bin/autotune"
         WORKING_DIRECTORY "${CMAKE_INSTALL_PREFIX}"
         RESULT_VARIABLE AUTOTUNE_RESULT
+        TIMEOUT 300
     )
+    message(STATUS "Finished autojitter calibration with code: ${AUTOTUNE_RESULT}")
     if(NOT AUTOTUNE_RESULT EQUAL 0)
         message(FATAL_ERROR "autotune failed during installation")
     endif()
