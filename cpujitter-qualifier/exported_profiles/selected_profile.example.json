@@ -1,0 +1,10 @@
+{
+  "id": "linux-x86_64-generic-x86-qualified",
+  "os": "linux",
+  "arch": "x86_64",
+  "cpu_vendor": "generic-x86",
+  "osr": 2,
+  "mem_blocks": 64,
+  "mem_block_size": 64,
+  "smoke_bytes": 32
+}
