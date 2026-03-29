@@ -131,6 +131,19 @@ Stale/incompatible/corrupt cache files are rejected cleanly and runtime falls ba
 
 Keep the cache file writable by the running process.
 
+
+## External dependency bootstrap
+Use `scripts/fetch_external_deps.sh` to download/update:
+- `external/jitterentropy`
+- `cpujitter-qualifier/external/SP800-90B_EntropyAssessment`
+
+Example:
+```bash
+./scripts/fetch_external_deps.sh
+```
+
+You can override repos/refs with flags or env vars (`JENT_REPO`, `JENT_REF`, `NIST_REPO`, `NIST_REF`).
+
 ## Related internal tooling
 A separate qualification tooling repository is provided at `cpujitter-qualifier/`.
 It is intended for lab/CI profile generation and is not a runtime dependency of `libcpujitter`.
