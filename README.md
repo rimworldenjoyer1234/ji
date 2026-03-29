@@ -151,3 +151,7 @@ It is intended for lab/CI profile generation and is not a runtime dependency of 
 
 ## Recalibration strategy
 Runtime sweeps a small practical matrix: `osr=[3,4,6,8]`, `hashloop=[1,4,8]`, `max_memsize=[64,256,1024]` and timer strategies `(native, disable_internal_timer, force_internal_timer)`, preferring native + lower settings first.
+
+
+## Guía en español
+Consulta `docs/GUIA_USO_ES.md` para un paso a paso completo de uso e integración en otra app.
