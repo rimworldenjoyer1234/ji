@@ -58,6 +58,19 @@ This keeps jitterentropy-specific details internal and out of public headers.
 ### Debug logging hook
 Set `CPUJITTER_LOG=1` to emit lifecycle logs to `stderr` during init/recalibration decisions.
 
+
+## Deterministic profile matching
+`profiles/index.json` now references per-profile JSON files.
+Matching input uses platform OS, arch, cpu vendor, cpu model, virtualization type, and logical CPU count.
+Selection rules:
+- exact core match required (`os`, `arch`, `cpu_vendor`)
+- CPU model exact rule beats family rule
+- family rule supports simple `*` suffix pattern (e.g. `x86-*`)
+- bare-metal profiles are preferred unless platform virtualization is `vm`
+- tie-breaks are stable by profile `id` lexical order
+
+`cpujitter_get_status_json` includes a match explanation string for debugging selection outcomes.
+
 ## Fair die rolling
 `cpujitter_roll_die` uses rejection sampling:
 - Draw one byte.
@@ -79,19 +92,13 @@ ctest --test-dir build --output-on-failure
 ```
 
 ## Profile format (`profiles/index.json`)
-Top-level object with:
+Top-level index object with:
 - `schema_version` (int)
-- `profiles` (array)
+- `profiles` array of `{id, path}` entries
 
-Each profile includes:
-- `id` (string)
-- `os` (string)
-- `arch` (string)
-- `cpu_vendor` (string)
-- `osr` (int)
-- `mem_blocks` (int)
-- `mem_block_size` (int)
-- `smoke_bytes` (int)
+Each per-profile file includes:
+- base fields: `id`, `os`, `arch`, `cpu_vendor`, `osr`, `mem_blocks`, `mem_block_size`, `smoke_bytes`
+- optional `match` fields: `virtualization`, `cpu_model_exact`, `cpu_model_family`, `logical_cpu_min`, `logical_cpu_max`
 
 ## Cache format
 Runtime writes a validated cache JSON (ignored by git by default), example template:

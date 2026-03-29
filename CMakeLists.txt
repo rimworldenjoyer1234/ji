@@ -29,3 +29,7 @@ add_executable(cpujitter_tests tests/test_cpujitter.c)
 target_link_libraries(cpujitter_tests PRIVATE cpujitter)
 target_compile_definitions(cpujitter_tests PRIVATE CPUJITTER_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME cpujitter_tests COMMAND cpujitter_tests)
+
+add_executable(cpujitter_match_tests tests/test_profile_matching.c)
+target_link_libraries(cpujitter_match_tests PRIVATE cpujitter)
+add_test(NAME cpujitter_match_tests COMMAND cpujitter_match_tests)

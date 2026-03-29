@@ -10,6 +10,11 @@ typedef struct profile_entry {
     char os[32];
     char arch[32];
     char cpu_vendor[32];
+    char virtualization[16];
+    char cpu_model_exact[64];
+    char cpu_model_family[64]; /* simple '*' suffix pattern */
+    int logical_cpu_min;
+    int logical_cpu_max;
     int osr;
     int mem_blocks;
     int mem_block_size;
@@ -21,12 +26,13 @@ struct cpujitter_ctx {
     cpujitter_runtime_config runtime;
     char profiles_index_path[256];
     char cache_path[256];
+    char match_explanation[256];
     int backend_initialized;
 };
 
 void cpujitter_detect_platform(cpujitter_platform_info *out_info);
 
-cpujitter_err cpujitter_profiles_load(const char *path,
+cpujitter_err cpujitter_profiles_load(const char *index_path,
                                       profile_entry *out_entries,
                                       size_t out_cap,
                                       size_t *out_count);
@@ -39,7 +45,9 @@ cpujitter_err cpujitter_profiles_find_by_id(const profile_entry *entries,
 cpujitter_err cpujitter_profiles_select_best(const profile_entry *entries,
                                              size_t count,
                                              const cpujitter_platform_info *platform,
-                                             profile_entry *out_match);
+                                             profile_entry *out_match,
+                                             char *out_explanation,
+                                             size_t out_explanation_len);
 
 cpujitter_err cpujitter_cache_load(const char *path, profile_entry *out_entry);
 cpujitter_err cpujitter_cache_save(const char *path,

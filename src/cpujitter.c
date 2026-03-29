@@ -71,6 +71,7 @@ static cpujitter_err init_from_cache(cpujitter_ctx *ctx, int *out_used_cache) {
     }
 
     *out_used_cache = 1;
+    snprintf(ctx->match_explanation, sizeof(ctx->match_explanation), "cache profile id=%s accepted", cache_entry.id);
     cpujitter_log("using cached validated profile '%s'", cache_entry.id);
     return CPUJITTER_OK;
 }
@@ -96,8 +97,16 @@ static cpujitter_err init_from_bundled_profiles(cpujitter_ctx *ctx,
 
     if (force_profile_id) {
         err = cpujitter_profiles_find_by_id(entries, count, force_profile_id, out_selected);
+        if (err == CPUJITTER_OK) {
+            snprintf(ctx->match_explanation, sizeof(ctx->match_explanation), "forced profile id=%s", force_profile_id);
+        }
     } else {
-        err = cpujitter_profiles_select_best(entries, count, &ctx->platform, out_selected);
+        err = cpujitter_profiles_select_best(entries,
+                                             count,
+                                             &ctx->platform,
+                                             out_selected,
+                                             ctx->match_explanation,
+                                             sizeof(ctx->match_explanation));
     }
     if (err != CPUJITTER_OK) {
         cpujitter_log("no bundled profile selected (%s)", cpujitter_strerror(err));
@@ -131,10 +140,13 @@ static cpujitter_err init_common(cpujitter_ctx **out_ctx,
     cpujitter_detect_platform(&ctx->platform);
     snprintf(ctx->profiles_index_path, sizeof(ctx->profiles_index_path), "%s", profiles_index_path);
     snprintf(ctx->cache_path, sizeof(ctx->cache_path), "%s", cache_path);
-    cpujitter_log("init platform os=%s arch=%s cpu_vendor=%s",
+    cpujitter_log("init platform os=%s arch=%s vendor=%s model=%s virt=%s cpus=%d",
                   ctx->platform.os,
                   ctx->platform.arch,
-                  ctx->platform.cpu_vendor);
+                  ctx->platform.cpu_vendor,
+                  ctx->platform.cpu_model,
+                  ctx->platform.virtualization,
+                  ctx->platform.logical_cpu_count);
 
     if (!force_profile_id) {
         err = init_from_cache(ctx, &used_cache);
@@ -152,6 +164,9 @@ static cpujitter_err init_common(cpujitter_ctx **out_ctx,
     if (err == CPUJITTER_OK) {
         err = cpujitter_apply_profile(ctx, &selected, 2);
         if (err == CPUJITTER_OK) {
+            if (ctx->match_explanation[0] == '\0') {
+                snprintf(ctx->match_explanation, sizeof(ctx->match_explanation), "bundled profile id=%s accepted", selected.id);
+            }
             (void)cpujitter_cache_save(ctx->cache_path, &selected, &ctx->platform);
             cpujitter_log("bundled profile accepted and cached: %s", selected.id);
             *out_ctx = ctx;
@@ -178,6 +193,7 @@ static cpujitter_err init_common(cpujitter_ctx **out_ctx,
         return err;
     }
 
+    snprintf(ctx->match_explanation, sizeof(ctx->match_explanation), "recalibrated from profile id=%s", selected.id);
     (void)cpujitter_cache_save(ctx->cache_path, &tuned, &ctx->platform);
     cpujitter_log("recalibration succeeded and cached profile '%s'", tuned.id);
 
@@ -281,12 +297,16 @@ cpujitter_err cpujitter_get_status_json(cpujitter_ctx *ctx,
 
     n = snprintf(out_buf,
                  out_buf_len,
-                 "{\"profile_id\":\"%s\",\"source\":%d,\"platform\":{\"os\":\"%s\",\"arch\":\"%s\",\"cpu_vendor\":\"%s\"},\"config\":{\"osr\":%d,\"mem_blocks\":%d,\"mem_block_size\":%d,\"smoke_bytes\":%d}}",
+                 "{\"profile_id\":\"%s\",\"source\":%d,\"match_explanation\":\"%s\",\"platform\":{\"os\":\"%s\",\"arch\":\"%s\",\"cpu_vendor\":\"%s\",\"cpu_model\":\"%s\",\"virtualization\":\"%s\",\"logical_cpu_count\":%d},\"config\":{\"osr\":%d,\"mem_blocks\":%d,\"mem_block_size\":%d,\"smoke_bytes\":%d}}",
                  ctx->runtime.profile_id,
                  ctx->runtime.source,
+                 ctx->match_explanation,
                  ctx->platform.os,
                  ctx->platform.arch,
                  ctx->platform.cpu_vendor,
+                 ctx->platform.cpu_model,
+                 ctx->platform.virtualization,
+                 ctx->platform.logical_cpu_count,
                  ctx->runtime.osr,
                  ctx->runtime.mem_blocks,
                  ctx->runtime.mem_block_size,

@@ -143,9 +143,16 @@ cpujitter_err cpujitter_cache_load(const char *path, profile_entry *out_entry) {
         parse_int_field(prof, "osr", &out_entry->osr) != 0 ||
         parse_int_field(prof, "mem_blocks", &out_entry->mem_blocks) != 0 ||
         parse_int_field(prof, "mem_block_size", &out_entry->mem_block_size) != 0 ||
-        parse_int_field(prof, "smoke_bytes", &out_entry->smoke_bytes) != 0) {
+        parse_int_field(prof, "smoke_bytes", &out_entry->smoke_bytes) != 0) { 
         return CPUJITTER_ERR_PARSE;
     }
+
+
+    (void)parse_string_field(prof, "virtualization", out_entry->virtualization, sizeof(out_entry->virtualization));
+    (void)parse_string_field(prof, "cpu_model_exact", out_entry->cpu_model_exact, sizeof(out_entry->cpu_model_exact));
+    (void)parse_string_field(prof, "cpu_model_family", out_entry->cpu_model_family, sizeof(out_entry->cpu_model_family));
+    (void)parse_int_field(prof, "logical_cpu_min", &out_entry->logical_cpu_min);
+    (void)parse_int_field(prof, "logical_cpu_max", &out_entry->logical_cpu_max);
 
     return CPUJITTER_OK;
 }
@@ -173,6 +180,11 @@ cpujitter_err cpujitter_cache_save(const char *path,
                 "    \"os\": \"%s\",\n"
                 "    \"arch\": \"%s\",\n"
                 "    \"cpu_vendor\": \"%s\",\n"
+                "    \"virtualization\": \"%s\",\n"
+                "    \"cpu_model_exact\": \"%s\",\n"
+                "    \"cpu_model_family\": \"%s\",\n"
+                "    \"logical_cpu_min\": %d,\n"
+                "    \"logical_cpu_max\": %d,\n"
                 "    \"osr\": %d,\n"
                 "    \"mem_blocks\": %d,\n"
                 "    \"mem_block_size\": %d,\n"
@@ -186,6 +198,11 @@ cpujitter_err cpujitter_cache_save(const char *path,
                 entry->os,
                 entry->arch,
                 entry->cpu_vendor,
+                entry->virtualization,
+                entry->cpu_model_exact,
+                entry->cpu_model_family,
+                entry->logical_cpu_min,
+                entry->logical_cpu_max,
                 entry->osr,
                 entry->mem_blocks,
                 entry->mem_block_size,

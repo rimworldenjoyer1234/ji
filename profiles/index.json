@@ -1,35 +1,8 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "profiles": [
-    {
-      "id": "linux-aarch64-generic-arm-v1",
-      "os": "linux",
-      "arch": "aarch64",
-      "cpu_vendor": "generic-arm",
-      "osr": 2,
-      "mem_blocks": 64,
-      "mem_block_size": 64,
-      "smoke_bytes": 32
-    },
-    {
-      "id": "linux-x86_64-generic-x86-v1",
-      "os": "linux",
-      "arch": "x86_64",
-      "cpu_vendor": "generic-x86",
-      "osr": 2,
-      "mem_blocks": 64,
-      "mem_block_size": 64,
-      "smoke_bytes": 32
-    },
-    {
-      "id": "linux-x86_64-generic-x86-v2",
-      "os": "linux",
-      "arch": "x86_64",
-      "cpu_vendor": "generic-x86",
-      "osr": 3,
-      "mem_blocks": 64,
-      "mem_block_size": 128,
-      "smoke_bytes": 32
-    }
+    {"id": "linux-x86_64-generic-x86-baremetal-v1", "path": "linux_x86_64_generic_baremetal_v1.json"},
+    {"id": "linux-x86_64-generic-x86-vm-v1", "path": "linux_x86_64_generic_vm_v1.json"},
+    {"id": "linux-aarch64-generic-arm-v1", "path": "linux_aarch64_generic_arm_v1.json"}
   ]
 }

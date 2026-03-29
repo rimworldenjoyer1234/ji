@@ -27,6 +27,9 @@ typedef struct cpujitter_platform_info {
     char os[32];
     char arch[32];
     char cpu_vendor[32];
+    char cpu_model[64];
+    char virtualization[16]; /* baremetal|vm|unknown */
+    int logical_cpu_count;
 } cpujitter_platform_info;
 
 typedef struct cpujitter_runtime_config {

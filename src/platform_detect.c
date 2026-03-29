@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <string.h>
 
+#if !defined(_WIN32)
+#include <unistd.h>
+#endif
+
 static void safe_copy(char *dst, size_t dst_sz, const char *src) {
     if (dst_sz == 0) {
         return;
@@ -41,5 +45,24 @@ void cpujitter_detect_platform(cpujitter_platform_info *out_info) {
     safe_copy(out_info->cpu_vendor, sizeof(out_info->cpu_vendor), "generic-arm");
 #else
     safe_copy(out_info->cpu_vendor, sizeof(out_info->cpu_vendor), "generic");
+#endif
+
+#if defined(__x86_64__) || defined(__i386__) || defined(_M_X64) || defined(_M_IX86)
+    safe_copy(out_info->cpu_model, sizeof(out_info->cpu_model), "x86-generic");
+#elif defined(__aarch64__)
+    safe_copy(out_info->cpu_model, sizeof(out_info->cpu_model), "arm-generic");
+#else
+    safe_copy(out_info->cpu_model, sizeof(out_info->cpu_model), "unknown");
+#endif
+
+    safe_copy(out_info->virtualization, sizeof(out_info->virtualization), "baremetal");
+
+#if defined(_WIN32)
+    out_info->logical_cpu_count = 1;
+#else
+    {
+        long n = sysconf(_SC_NPROCESSORS_ONLN);
+        out_info->logical_cpu_count = n > 0 ? (int)n : 1;
+    }
 #endif
 }
