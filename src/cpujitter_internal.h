@@ -50,6 +50,11 @@ cpujitter_err cpujitter_profiles_select_best(const profile_entry *entries,
                                              size_t out_explanation_len);
 
 cpujitter_err cpujitter_cache_load(const char *path, profile_entry *out_entry);
+cpujitter_err cpujitter_cache_validate_platform(const char *path,
+                                                const cpujitter_platform_info *platform);
+cpujitter_err cpujitter_cache_load_validated(const char *path,
+                                             const cpujitter_platform_info *platform,
+                                             profile_entry *out_entry);
 cpujitter_err cpujitter_cache_save(const char *path,
                                    const profile_entry *entry,
                                    const cpujitter_platform_info *platform);

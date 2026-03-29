@@ -12,6 +12,44 @@ static void paths(char *profiles, size_t profiles_sz, char *cache, size_t cache_
     snprintf(cache, cache_sz, "test_local_profile.json");
 }
 
+static int replace_in_file(const char *path, const char *needle, const char *replacement) {
+    FILE *f;
+    char buf[8192];
+    char out[8192];
+    char *pos;
+    size_t n;
+
+    f = fopen(path, "rb");
+    if (!f) {
+        return -1;
+    }
+    n = fread(buf, 1U, sizeof(buf) - 1U, f);
+    fclose(f);
+    if (n == 0) {
+        return -1;
+    }
+    buf[n] = '\0';
+
+    pos = strstr(buf, needle);
+    if (!pos) {
+        return -1;
+    }
+
+    *pos = '\0';
+    snprintf(out, sizeof(out), "%s%s%s", buf, replacement, pos + strlen(needle));
+
+    f = fopen(path, "wb");
+    if (!f) {
+        return -1;
+    }
+    if (fputs(out, f) < 0) {
+        fclose(f);
+        return -1;
+    }
+    fclose(f);
+    return 0;
+}
+
 static int test_init_and_bytes(void) {
     cpujitter_ctx *ctx = NULL;
     cpujitter_err err;
@@ -45,7 +83,7 @@ static int test_init_and_bytes(void) {
     return 0;
 }
 
-static int test_cache_then_reuse(void) {
+static int test_cache_valid_reuse(void) {
     cpujitter_ctx *ctx = NULL;
     cpujitter_err err;
     cpujitter_runtime_config cfg;
@@ -60,12 +98,6 @@ static int test_cache_then_reuse(void) {
         fprintf(stderr, "first init failed: %s\n", cpujitter_strerror(err));
         return 1;
     }
-    err = cpujitter_get_runtime_config(ctx, &cfg);
-    if (err != CPUJITTER_OK || (cfg.source != 2 && cfg.source != 3)) {
-        fprintf(stderr, "first init source unexpected: %d\n", cfg.source);
-        cpujitter_shutdown(ctx);
-        return 1;
-    }
     cpujitter_shutdown(ctx);
 
     ctx = NULL;
@@ -76,11 +108,79 @@ static int test_cache_then_reuse(void) {
     }
     err = cpujitter_get_runtime_config(ctx, &cfg);
     if (err != CPUJITTER_OK || cfg.source != 1) {
-        fprintf(stderr, "second init did not use cache source: %d\n", cfg.source);
+        fprintf(stderr, "expected cache source, got: %d\n", cfg.source);
         cpujitter_shutdown(ctx);
         return 1;
     }
 
+    cpujitter_shutdown(ctx);
+    return 0;
+}
+
+static int test_cache_mismatch_rejected(void) {
+    cpujitter_ctx *ctx = NULL;
+    cpujitter_err err;
+    cpujitter_runtime_config cfg;
+    char profiles[512];
+    char cache[256];
+
+    paths(profiles, sizeof(profiles), cache, sizeof(cache));
+    (void)remove(cache);
+
+    err = cpujitter_init(&ctx, profiles, cache);
+    if (err != CPUJITTER_OK) {
+        return 1;
+    }
+    cpujitter_shutdown(ctx);
+
+    if (replace_in_file(cache, "\"cpu_vendor\": \"generic-x86\"", "\"cpu_vendor\": \"wrong-vendor\"") != 0) {
+        fprintf(stderr, "failed to mutate cache\n");
+        return 1;
+    }
+
+    ctx = NULL;
+    err = cpujitter_init(&ctx, profiles, cache);
+    if (err != CPUJITTER_OK) {
+        fprintf(stderr, "init failed unexpectedly: %s\n", cpujitter_strerror(err));
+        return 1;
+    }
+    err = cpujitter_get_runtime_config(ctx, &cfg);
+    if (err != CPUJITTER_OK || cfg.source == 1) {
+        fprintf(stderr, "mismatched cache should not be used\n");
+        cpujitter_shutdown(ctx);
+        return 1;
+    }
+    cpujitter_shutdown(ctx);
+    return 0;
+}
+
+static int test_cache_corrupted_rejected(void) {
+    cpujitter_ctx *ctx = NULL;
+    cpujitter_err err;
+    cpujitter_runtime_config cfg;
+    char profiles[512];
+    char cache[256];
+    FILE *f;
+
+    paths(profiles, sizeof(profiles), cache, sizeof(cache));
+    f = fopen(cache, "wb");
+    if (!f) {
+        return 1;
+    }
+    fputs("{ bad json", f);
+    fclose(f);
+
+    err = cpujitter_init(&ctx, profiles, cache);
+    if (err != CPUJITTER_OK) {
+        fprintf(stderr, "init should recover from corrupt cache: %s\n", cpujitter_strerror(err));
+        return 1;
+    }
+    err = cpujitter_get_runtime_config(ctx, &cfg);
+    if (err != CPUJITTER_OK || cfg.source == 1) {
+        fprintf(stderr, "corrupted cache should not be used\n");
+        cpujitter_shutdown(ctx);
+        return 1;
+    }
     cpujitter_shutdown(ctx);
     return 0;
 }
@@ -116,7 +216,7 @@ static int test_die_roll_range(void) {
 static int test_status_json(void) {
     cpujitter_ctx *ctx = NULL;
     cpujitter_err err;
-    char status[512];
+    char status[1024];
     size_t written = 0;
     char profiles[512];
     char cache[256];
@@ -128,7 +228,8 @@ static int test_status_json(void) {
     }
 
     err = cpujitter_get_status_json(ctx, status, sizeof(status), &written);
-    if (err != CPUJITTER_OK || written == 0 || strstr(status, "profile_id") == NULL) {
+    if (err != CPUJITTER_OK || written == 0 || strstr(status, "profile_id") == NULL ||
+        strstr(status, "match_explanation") == NULL) {
         fprintf(stderr, "status json failed\n");
         cpujitter_shutdown(ctx);
         return 1;
@@ -151,7 +252,9 @@ static int test_invalid_args(void) {
 int main(void) {
     int failed = 0;
     failed |= test_init_and_bytes();
-    failed |= test_cache_then_reuse();
+    failed |= test_cache_valid_reuse();
+    failed |= test_cache_mismatch_rejected();
+    failed |= test_cache_corrupted_rejected();
     failed |= test_die_roll_range();
     failed |= test_status_json();
     failed |= test_invalid_args();

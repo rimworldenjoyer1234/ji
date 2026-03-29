@@ -1,9 +1,12 @@
 {
   "schema_version": 1,
-  "platform": {
+  "platform_fingerprint": {
     "os": "linux",
     "arch": "x86_64",
-    "cpu_vendor": "generic-x86"
+    "cpu_vendor": "generic-x86",
+    "cpu_model": "x86-generic",
+    "virtualization": "baremetal",
+    "logical_cpu_count": 8
   },
   "validated_profile": {
     "id": "linux-x86_64-generic-x86-baremetal-v1",

@@ -49,19 +49,17 @@ static cpujitter_err init_from_cache(cpujitter_ctx *ctx, int *out_used_cache) {
     }
     *out_used_cache = 0;
 
-    err = cpujitter_cache_load(ctx->cache_path, &cache_entry);
+    err = cpujitter_cache_load_validated(ctx->cache_path, &ctx->platform, &cache_entry);
     if (err != CPUJITTER_OK) {
-        cpujitter_log("no usable cache at %s (%s)", ctx->cache_path, cpujitter_strerror(err));
-        return CPUJITTER_OK;
-    }
-
-    if (strcmp(cache_entry.os, ctx->platform.os) != 0 || strcmp(cache_entry.arch, ctx->platform.arch) != 0) {
-        cpujitter_log("cache profile platform mismatch (cache=%s/%s local=%s/%s)",
-                      cache_entry.os,
-                      cache_entry.arch,
-                      ctx->platform.os,
-                      ctx->platform.arch);
-        return CPUJITTER_OK;
+        if (err == CPUJITTER_ERR_NO_PROFILE) {
+            cpujitter_log("cache rejected as stale/incompatible: %s", ctx->cache_path);
+            return CPUJITTER_OK;
+        }
+        if (err == CPUJITTER_ERR_IO || err == CPUJITTER_ERR_PARSE) {
+            cpujitter_log("cache unavailable/corrupt: %s (%s)", ctx->cache_path, cpujitter_strerror(err));
+            return CPUJITTER_OK;
+        }
+        return err;
     }
 
     err = cpujitter_apply_profile(ctx, &cache_entry, 1);

@@ -101,7 +101,13 @@ Each per-profile file includes:
 - optional `match` fields: `virtualization`, `cpu_model_exact`, `cpu_model_family`, `logical_cpu_min`, `logical_cpu_max`
 
 ## Cache format
-Runtime writes a validated cache JSON (ignored by git by default), example template:
+Runtime writes a simple versioned cache JSON (ignored by git by default), example template:
+- `schema_version`
+- `platform_fingerprint` (`os`, `arch`, `cpu_vendor`, `cpu_model`, `virtualization`, `logical_cpu_count`)
+- `validated_profile` runtime parameters
+
+On startup, cache entries are validated against the current platform fingerprint.
+Stale/incompatible/corrupt cache files are rejected cleanly and runtime falls back to bundled profiles/recalibration.
 - `cache/local_profile.sample.json`
 
 ## Repository layout
