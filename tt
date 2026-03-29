@@ -1,0 +1,256 @@
+Sí. La forma más útil de verlo es por **dónde se tocan**.
+
+## 1) Parámetros públicos que puedes configurar desde la API
+
+Estos son los que tocarías desde tu aplicación, sin modificar el core.
+
+### En `jitterentropy.h`
+
+Ruta: `jitterentropy.h` ([GitHub][1])
+
+* `osr`
+
+  * Dónde: argumento de `jent_entropy_init_ex(unsigned int osr, unsigned int flags)` y de `jent_entropy_collector_alloc(unsigned int osr, unsigned int flags)`
+  * Qué hace: oversampling rate
+  * Qué tocar: el valor que pasas en esas llamadas. El manual indica que `0` suele significar usar el valor por defecto y que valores bajos se elevan al mínimo interno. ([GitHub][2])
+
+* `flags`
+
+  * Dónde: mismo sitio, segundo argumento de `jent_entropy_init_ex(...)` y `jent_entropy_collector_alloc(...)`
+  * Qué tocar: combinar bits con OR
+
+#### Flags concretos en `jitterentropy.h`
+
+* `JENT_DISABLE_MEMORY_ACCESS`
+* `JENT_FORCE_INTERNAL_TIMER`
+* `JENT_DISABLE_INTERNAL_TIMER`
+* `JENT_FORCE_FIPS`
+* `JENT_NTG1`
+* `JENT_CACHE_ALL` ([GitHub][1])
+
+#### Flags para memoria máxima
+
+También en `jitterentropy.h`:
+
+* `JENT_MAX_MEMSIZE_1kB`
+* `JENT_MAX_MEMSIZE_2kB`
+* `JENT_MAX_MEMSIZE_4kB`
+* `JENT_MAX_MEMSIZE_8kB`
+* `JENT_MAX_MEMSIZE_16kB`
+* `JENT_MAX_MEMSIZE_32kB`
+* `JENT_MAX_MEMSIZE_64kB`
+* `JENT_MAX_MEMSIZE_128kB`
+* `JENT_MAX_MEMSIZE_256kB`
+* `JENT_MAX_MEMSIZE_512kB`
+* `JENT_MAX_MEMSIZE_1MB`
+* `JENT_MAX_MEMSIZE_2MB`
+* `JENT_MAX_MEMSIZE_4MB`
+* `JENT_MAX_MEMSIZE_8MB`
+* `JENT_MAX_MEMSIZE_16MB`
+* `JENT_MAX_MEMSIZE_32MB`
+* `JENT_MAX_MEMSIZE_64MB`
+* `JENT_MAX_MEMSIZE_128MB`
+* `JENT_MAX_MEMSIZE_256MB`
+* `JENT_MAX_MEMSIZE_512MB` ([GitHub][1])
+
+#### Flags para hash loop
+
+También en `jitterentropy.h`:
+
+* `JENT_HASHLOOP_1`
+* `JENT_HASHLOOP_2`
+* `JENT_HASHLOOP_4`
+* `JENT_HASHLOOP_8`
+* `JENT_HASHLOOP_16`
+* `JENT_HASHLOOP_32`
+* `JENT_HASHLOOP_64`
+* `JENT_HASHLOOP_128` ([GitHub][1])
+
+## 2) Funciones/API que cambian el comportamiento
+
+También son configurables, aunque no sean "constantes".
+
+### En `jitterentropy.h` / `doc/jitterentropy.3`
+
+* `jent_set_fips_failure_callback(...)`
+
+  * Dónde tocar: llamada antes de `jent_entropy_init`
+  * Para qué: callback ante fallos de health tests en modo FIPS
+
+* `jent_entropy_switch_notime_impl(...)`
+
+  * Dónde tocar: llamada antes de `jent_entropy_init`
+  * Para qué: sustituir el gestor de hilos del modo internal timer / timer-less
+
+* `jent_read_entropy_safe(...)`
+
+  * Dónde tocar: en tu código cliente
+  * Para qué: reintenta con nueva configuración si hay fallo de health test; el manual dice que al realocar aumenta automáticamente el OSR. ([GitHub][1])
+
+## 3) Si quieres cambiar los valores por defecto del core
+
+Aquí ya no cambias tu app: cambias la librería.
+
+### Archivo principal a tocar: `src/jitterentropy-internal.h`
+
+Ahí están los `#define` internos que gobiernan casi todos los defaults del motor. `src/jitterentropy-base.c` incluye explícitamente `jitterentropy-internal.h`, así que ése es el sitio natural para tocar defaults globales. ([GitHub][3])
+
+Los nombres que normalmente se ajustan ahí son:
+
+* `JENT_MIN_OSR`
+* `JENT_MAX_OSR`
+* `JENT_DEFAULT_MEMORY_BITS`
+* `JENT_CACHE_SHIFT_BITS`
+* `JENT_MEM_ACC_LOOP_DEFAULT`
+* `JENT_MEM_ACC_LOOP_INIT`
+* `JENT_HASH_LOOP_DEFAULT`
+* `JENT_HASH_LOOP_INIT`
+* `JENT_APT_MASK`
+* `JENT_HEALTH_LAG_PREDICTOR`
+* `ENTROPY_SAFETY_FACTOR`
+* `JENT_STUCK_INIT_THRES`
+
+En la práctica:
+
+* si quieres cambiar el **OSR mínimo o máximo**, tocas `src/jitterentropy-internal.h`
+* si quieres cambiar el **tamaño de memoria por defecto**, tocas `src/jitterentropy-internal.h`
+* si quieres cambiar los **loops internos** de memoria o hash, tocas `src/jitterentropy-internal.h`
+* si quieres cambiar máscaras o umbrales de tests, también `src/jitterentropy-internal.h`
+
+## 4) Si quieres cambiar la lógica de asignación automática
+
+### En `src/jitterentropy-base.c`
+
+Ruta: `src/jitterentropy-base.c` ([GitHub][3])
+
+Aquí tocarías la lógica, no sólo un `#define`.
+
+Lo importante en este fichero es:
+
+* la inicialización y tests de arranque
+* cómo se interpreta `osr`
+* cómo se usa `flags`
+* la lógica de realloc/recuperación de `jent_read_entropy_safe`
+* la lógica de sizing automático de memoria desde cachés
+* el guard contra compilación con optimizaciones (`__OPTIMIZE__`) ([GitHub][3])
+
+Si quieres cambiar:
+
+* la política de **autoajuste tras fallo**
+* cuándo subir **OSR**
+* cuándo aumentar **memoria**
+* cuándo abortar por health tests
+
+el fichero a tocar es `src/jitterentropy-base.c`.
+
+## 5) Si quieres cambiar umbrales de health tests
+
+### En `src/jitterentropy-health.c`
+
+Ruta: `src/jitterentropy-health.c` ([GitHub][4])
+
+Aquí tocarías:
+
+* tablas/cutoffs de `APT`
+* tablas/cutoffs de `RCT`
+* lógica del lag predictor
+* lógica de fallos permanentes/intermitentes
+* reporting de fallos FIPS
+
+Si quieres modificar la sensibilidad de:
+
+* `APT`
+* `RCT`
+* `LAG`
+* `RCT_MEM`
+
+se toca `src/jitterentropy-health.c`.
+
+## 6) Si quieres cambiar el internal timer / timer-less
+
+### En `src/jitterentropy-timer.c`
+
+Ruta: `src/jitterentropy-timer.c` ([GitHub][5])
+
+Aquí están las variables y puntos clave:
+
+* `jent_force_internal_timer`
+* `jent_notime_switch_blocked`
+* `notime_thread`
+* `jent_notime_init(...)`
+* `jent_notime_start(...)`
+* `jent_notime_stop(...)`
+* `jent_notime_enable(...)`
+* `jent_notime_force(...)`
+* `jent_notime_forced(...)`
+
+Si quieres cambiar:
+
+* cuándo se fuerza el internal timer
+* cómo se crea o destruye el hilo contador
+* la política de requerir al menos 2 CPUs
+* la implementación del contador interno
+
+tienes que tocar `src/jitterentropy-timer.c`. Ese archivo muestra además que el internal timer sólo está disponible si se compila con `JENT_CONF_ENABLE_INTERNAL_TIMER` y que el modo timer-less requiere al menos 2 CPUs. ([GitHub][5])
+
+## 7) Si quieres cambiar la fuente de tiempo de la plataforma
+
+### En `jitterentropy-base-user.h` o headers de arquitectura
+
+El propio `jitterentropy.h` incluye `jitterentropy-base-user.h` en plataformas no Windows. ([GitHub][1])
+
+Ahí tocarías:
+
+* `jent_get_nstime(...)`
+* selección del reloj o contador de timestamp para esa plataforma
+* integración con headers específicos de arquitectura
+
+Esto es donde cambias la fuente de tiempo base si quieres adaptar el proyecto a otra plataforma.
+
+## 8) Si quieres cambiar opciones de compilación
+
+### En `CMakeLists.txt`
+
+Aquí tocarías opciones de build como:
+
+* soporte de internal timer
+* opciones específicas de arquitectura
+* integración criptográfica externa
+* hardening de compilación
+
+En especial, para el internal timer el código de `src/jitterentropy-timer.c` depende de `JENT_CONF_ENABLE_INTERNAL_TIMER`. ([GitHub][5])
+
+## 9) Si quieres cambiar los parámetros del autotuning/test tool
+
+### En `tests/raw-entropy/recording_userspace/jitterentropy-hashtime.c`
+
+Éste es el sitio para tocar el programa de test/autoconfiguración que usarías en instalación. El manual además dice que el toolkit de test se usa para calcular la tasa SP800-90B y encontrar settings óptimos. ([GitHub][2])
+
+Aquí puedes tocar:
+
+* parsing de opciones de línea de comandos
+* combinaciones de `osr`
+* combinaciones de `max-mem`
+* combinaciones de `hashloop`
+* uso de `--force-fips`
+* uso de `--force-internal-timer` o `--disable-internal-timer`
+
+## Lista rápida final: qué tocar según lo que quieras cambiar
+
+* **OSR en runtime** → tu código, en `jent_entropy_init_ex(..., osr, ...)` y `jent_entropy_collector_alloc(..., osr, ...)` ([GitHub][2])
+* **Flags en runtime** → `jitterentropy.h` + tu código cliente ([GitHub][1])
+* **Memory max / hashloop en runtime** → `jitterentropy.h` + tu código cliente ([GitHub][1])
+* **Defaults internos** → `src/jitterentropy-internal.h` ([GitHub][3])
+* **Lógica de autoajuste y realloc** → `src/jitterentropy-base.c` ([GitHub][3])
+* **Health tests y umbrales** → `src/jitterentropy-health.c` ([GitHub][4])
+* **Internal timer / timer-less** → `src/jitterentropy-timer.c` ([GitHub][5])
+* **Fuente de tiempo de plataforma** → `jitterentropy-base-user.h` / headers de arquitectura ([GitHub][1])
+* **Autoconfigurador de instalación** → `tests/raw-entropy/recording_userspace/jitterentropy-hashtime.c` + scripts de test; el manual indica que ese toolkit sirve para calcular la tasa SP800-90B y obtener settings óptimos. ([GitHub][2])
+
+Puedo darte en el siguiente mensaje una **tabla compacta parámetro → archivo → función/macros exactas**.
+
+[1]: https://raw.githubusercontent.com/smuellerDD/jitterentropy-library/master/jitterentropy.h "raw.githubusercontent.com"
+[2]: https://raw.githubusercontent.com/smuellerDD/jitterentropy-library/master/doc/jitterentropy.3 "raw.githubusercontent.com"
+[3]: https://raw.githubusercontent.com/smuellerDD/jitterentropy-library/master/src/jitterentropy-base.c "raw.githubusercontent.com"
+[4]: https://raw.githubusercontent.com/smuellerDD/jitterentropy-library/master/src/jitterentropy-health.c "raw.githubusercontent.com"
+[5]: https://github.com/smuellerDD/jitterentropy-library/raw/refs/heads/master/src/jitterentropy-timer.c "raw.githubusercontent.com"
