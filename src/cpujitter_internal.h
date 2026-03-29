@@ -1,0 +1,85 @@
+#ifndef CPUJITTER_INTERNAL_H
+#define CPUJITTER_INTERNAL_H
+
+#include <stddef.h>
+
+#include "cpujitter/cpujitter.h"
+
+typedef struct profile_entry {
+    char id[64];
+    char os[32];
+    char arch[32];
+    char cpu_vendor[32];
+    char virtualization[16];
+    char cpu_model_exact[64];
+    char cpu_model_family[64];
+    int logical_cpu_min;
+    int logical_cpu_max;
+
+    int osr;
+    unsigned int flags;
+    int disable_memory_access;
+    int force_internal_timer;
+    int disable_internal_timer;
+    int force_fips;
+    int ntg1;
+    int cache_all;
+    int max_memsize_kb;
+    int hashloop;
+    int smoke_bytes;
+} profile_entry;
+
+struct cpujitter_ctx {
+    cpujitter_platform_info platform;
+    cpujitter_runtime_config runtime;
+    char profiles_index_path[256];
+    char cache_path[256];
+    char match_explanation[256];
+    void *backend_collector;
+    int backend_initialized;
+    int backend_init_success;
+    int backend_alloc_success;
+    int backend_smoke_success;
+    int backend_last_error;
+};
+
+void cpujitter_detect_platform(cpujitter_platform_info *out_info);
+
+cpujitter_err cpujitter_profiles_load(const char *index_path,
+                                      profile_entry *out_entries,
+                                      size_t out_cap,
+                                      size_t *out_count);
+cpujitter_err cpujitter_profiles_find_by_id(const profile_entry *entries,
+                                            size_t count,
+                                            const char *id,
+                                            profile_entry *out_match);
+cpujitter_err cpujitter_profiles_select_best(const profile_entry *entries,
+                                             size_t count,
+                                             const cpujitter_platform_info *platform,
+                                             profile_entry *out_match,
+                                             char *out_explanation,
+                                             size_t out_explanation_len);
+
+cpujitter_err cpujitter_cache_load(const char *path, profile_entry *out_entry);
+cpujitter_err cpujitter_cache_validate_platform(const char *path,
+                                                const cpujitter_platform_info *platform);
+cpujitter_err cpujitter_cache_load_validated(const char *path,
+                                             const cpujitter_platform_info *platform,
+                                             profile_entry *out_entry);
+cpujitter_err cpujitter_cache_save(const char *path,
+                                   const profile_entry *entry,
+                                   const cpujitter_platform_info *platform);
+
+cpujitter_err cpujitter_backend_init(cpujitter_ctx *ctx, const profile_entry *profile);
+cpujitter_err cpujitter_backend_get_bytes(cpujitter_ctx *ctx, unsigned char *out, size_t len);
+void cpujitter_backend_shutdown(cpujitter_ctx *ctx);
+
+cpujitter_err cpujitter_run_smoke_test(cpujitter_ctx *ctx, int smoke_bytes);
+cpujitter_err cpujitter_apply_profile(cpujitter_ctx *ctx,
+                                      const profile_entry *entry,
+                                      int source);
+cpujitter_err cpujitter_try_recalibrate(cpujitter_ctx *ctx,
+                                        const profile_entry *base,
+                                        profile_entry *out_tuned);
+
+#endif

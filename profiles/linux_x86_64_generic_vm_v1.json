@@ -1,0 +1,25 @@
+{
+  "schema_version": 2,
+  "id": "linux-x86_64-generic-x86-vm-v1",
+  "os": "linux",
+  "arch": "x86_64",
+  "cpu_vendor": "generic-x86",
+  "match": {
+    "virtualization": "vm",
+    "cpu_model_family": "x86-*",
+    "logical_cpu_min": 1,
+    "logical_cpu_max": 256
+  },
+  "runtime": {
+    "disable_memory_access": false,
+    "force_internal_timer": false,
+    "disable_internal_timer": false,
+    "force_fips": false,
+    "ntg1": false,
+    "cache_all": false,
+    "max_memsize": 256,
+    "hashloop": 1
+  },
+  "osr": 4,
+  "smoke_bytes": 64
+}

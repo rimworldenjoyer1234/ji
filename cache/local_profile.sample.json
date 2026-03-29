@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "platform_fingerprint": {
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu_vendor": "generic-x86",
+    "cpu_model": "x86-generic",
+    "virtualization": "baremetal",
+    "logical_cpu_count": 8
+  },
+  "validated_profile": {
+    "id": "linux-x86_64-generic-x86-baremetal-v1",
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu_vendor": "generic-x86",
+    "virtualization": "baremetal",
+    "cpu_model_exact": "",
+    "cpu_model_family": "x86-*",
+    "logical_cpu_min": 2,
+    "logical_cpu_max": 256,
+    "osr": 4,
+    "disable_memory_access": false,
+    "force_internal_timer": false,
+    "disable_internal_timer": false,
+    "force_fips": false,
+    "ntg1": false,
+    "cache_all": false,
+    "max_memsize": 256,
+    "hashloop": 1,
+    "smoke_bytes": 64
+  }
+}
