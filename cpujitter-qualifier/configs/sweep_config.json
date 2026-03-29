@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "osr_values": [1, 2, 3],
+  "mem_blocks_values": [32, 64],
+  "mem_block_size_values": [64, 128],
+  "smoke_bytes": 32,
+  "samples_per_candidate": 128
+}
