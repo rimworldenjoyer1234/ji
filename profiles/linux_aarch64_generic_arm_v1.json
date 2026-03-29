@@ -1,0 +1,16 @@
+{
+  "id": "linux-aarch64-generic-arm-v1",
+  "os": "linux",
+  "arch": "aarch64",
+  "cpu_vendor": "generic-arm",
+  "match": {
+    "virtualization": "baremetal",
+    "cpu_model_family": "arm-*",
+    "logical_cpu_min": 1,
+    "logical_cpu_max": 256
+  },
+  "osr": 2,
+  "mem_blocks": 64,
+  "mem_block_size": 64,
+  "smoke_bytes": 32
+}
