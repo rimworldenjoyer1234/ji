@@ -1,0 +1,8 @@
+build/
+artifacts/*
+!artifacts/.gitkeep
+reports/*
+!reports/.gitkeep
+exported_profiles/*
+!exported_profiles/.gitkeep
+!exported_profiles/selected_profile.example.json
