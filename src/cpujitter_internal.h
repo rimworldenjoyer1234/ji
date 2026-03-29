@@ -12,12 +12,20 @@ typedef struct profile_entry {
     char cpu_vendor[32];
     char virtualization[16];
     char cpu_model_exact[64];
-    char cpu_model_family[64]; /* simple '*' suffix pattern */
+    char cpu_model_family[64];
     int logical_cpu_min;
     int logical_cpu_max;
+
     int osr;
-    int mem_blocks;
-    int mem_block_size;
+    unsigned int flags;
+    int disable_memory_access;
+    int force_internal_timer;
+    int disable_internal_timer;
+    int force_fips;
+    int ntg1;
+    int cache_all;
+    int max_memsize_kb;
+    int hashloop;
     int smoke_bytes;
 } profile_entry;
 
@@ -27,7 +35,12 @@ struct cpujitter_ctx {
     char profiles_index_path[256];
     char cache_path[256];
     char match_explanation[256];
+    void *backend_collector;
     int backend_initialized;
+    int backend_init_success;
+    int backend_alloc_success;
+    int backend_smoke_success;
+    int backend_last_error;
 };
 
 void cpujitter_detect_platform(cpujitter_platform_info *out_info);
@@ -36,12 +49,10 @@ cpujitter_err cpujitter_profiles_load(const char *index_path,
                                       profile_entry *out_entries,
                                       size_t out_cap,
                                       size_t *out_count);
-
 cpujitter_err cpujitter_profiles_find_by_id(const profile_entry *entries,
                                             size_t count,
                                             const char *id,
                                             profile_entry *out_match);
-
 cpujitter_err cpujitter_profiles_select_best(const profile_entry *entries,
                                              size_t count,
                                              const cpujitter_platform_info *platform,
@@ -64,11 +75,9 @@ cpujitter_err cpujitter_backend_get_bytes(cpujitter_ctx *ctx, unsigned char *out
 void cpujitter_backend_shutdown(cpujitter_ctx *ctx);
 
 cpujitter_err cpujitter_run_smoke_test(cpujitter_ctx *ctx, int smoke_bytes);
-
 cpujitter_err cpujitter_apply_profile(cpujitter_ctx *ctx,
                                       const profile_entry *entry,
                                       int source);
-
 cpujitter_err cpujitter_try_recalibrate(cpujitter_ctx *ctx,
                                         const profile_entry *base,
                                         profile_entry *out_tuned);

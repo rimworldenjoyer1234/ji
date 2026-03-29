@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "platform_fingerprint": {
     "os": "linux",
     "arch": "x86_64",
@@ -18,9 +18,15 @@
     "cpu_model_family": "x86-*",
     "logical_cpu_min": 2,
     "logical_cpu_max": 256,
-    "osr": 2,
-    "mem_blocks": 64,
-    "mem_block_size": 64,
-    "smoke_bytes": 32
+    "osr": 4,
+    "disable_memory_access": false,
+    "force_internal_timer": false,
+    "disable_internal_timer": false,
+    "force_fips": false,
+    "ntg1": false,
+    "cache_all": false,
+    "max_memsize": 256,
+    "hashloop": 1,
+    "smoke_bytes": 64
   }
 }

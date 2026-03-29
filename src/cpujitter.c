@@ -35,9 +35,16 @@ static void build_default_profile(const cpujitter_platform_info *platform, profi
     snprintf(out->arch, sizeof(out->arch), "%s", platform->arch);
     snprintf(out->cpu_vendor, sizeof(out->cpu_vendor), "%s", platform->cpu_vendor);
     out->osr = 1;
-    out->mem_blocks = 64;
-    out->mem_block_size = 64;
+    out->disable_memory_access = 0;
+    out->force_internal_timer = 0;
+    out->disable_internal_timer = 0;
+    out->force_fips = 0;
+    out->ntg1 = 0;
+    out->cache_all = 0;
+    out->max_memsize_kb = 256;
+    out->hashloop = 1;
     out->smoke_bytes = 32;
+    out->flags = 0;
 }
 
 static cpujitter_err init_from_cache(cpujitter_ctx *ctx, int *out_used_cache) {
@@ -230,9 +237,16 @@ cpujitter_err cpujitter_recalibrate(cpujitter_ctx *ctx) {
     snprintf(base.arch, sizeof(base.arch), "%s", ctx->platform.arch);
     snprintf(base.cpu_vendor, sizeof(base.cpu_vendor), "%s", ctx->platform.cpu_vendor);
     base.osr = ctx->runtime.osr > 0 ? ctx->runtime.osr : 1;
-    base.mem_blocks = ctx->runtime.mem_blocks > 0 ? ctx->runtime.mem_blocks : 64;
-    base.mem_block_size = ctx->runtime.mem_block_size > 0 ? ctx->runtime.mem_block_size : 64;
+    base.disable_memory_access = ctx->runtime.disable_memory_access;
+    base.force_internal_timer = ctx->runtime.force_internal_timer;
+    base.disable_internal_timer = ctx->runtime.disable_internal_timer;
+    base.force_fips = ctx->runtime.force_fips;
+    base.ntg1 = ctx->runtime.ntg1;
+    base.cache_all = ctx->runtime.cache_all;
+    base.max_memsize_kb = ctx->runtime.max_memsize_kb > 0 ? ctx->runtime.max_memsize_kb : 256;
+    base.hashloop = ctx->runtime.hashloop > 0 ? ctx->runtime.hashloop : 1;
     base.smoke_bytes = ctx->runtime.smoke_bytes > 0 ? ctx->runtime.smoke_bytes : 32;
+    base.flags = ctx->runtime.flags;
 
     err = cpujitter_try_recalibrate(ctx, &base, &tuned);
     if (err != CPUJITTER_OK) {
@@ -295,7 +309,7 @@ cpujitter_err cpujitter_get_status_json(cpujitter_ctx *ctx,
 
     n = snprintf(out_buf,
                  out_buf_len,
-                 "{\"profile_id\":\"%s\",\"source\":%d,\"match_explanation\":\"%s\",\"platform\":{\"os\":\"%s\",\"arch\":\"%s\",\"cpu_vendor\":\"%s\",\"cpu_model\":\"%s\",\"virtualization\":\"%s\",\"logical_cpu_count\":%d},\"config\":{\"osr\":%d,\"mem_blocks\":%d,\"mem_block_size\":%d,\"smoke_bytes\":%d}}",
+                 "{\"profile_id\":\"%s\",\"source\":%d,\"match_explanation\":\"%s\",\"platform\":{\"os\":\"%s\",\"arch\":\"%s\",\"cpu_vendor\":\"%s\",\"cpu_model\":\"%s\",\"virtualization\":\"%s\",\"logical_cpu_count\":%d},\"config\":{\"osr\":%d,\"flags\":%u,\"disable_memory_access\":%d,\"force_internal_timer\":%d,\"disable_internal_timer\":%d,\"force_fips\":%d,\"ntg1\":%d,\"cache_all\":%d,\"max_memsize\":%d,\"hashloop\":%d,\"smoke_bytes\":%d},\"backend\":{\"init_success\":%d,\"collector_alloc_success\":%d,\"smoke_read_success\":%d,\"backend_error\":%d}}",
                  ctx->runtime.profile_id,
                  ctx->runtime.source,
                  ctx->match_explanation,
@@ -306,9 +320,20 @@ cpujitter_err cpujitter_get_status_json(cpujitter_ctx *ctx,
                  ctx->platform.virtualization,
                  ctx->platform.logical_cpu_count,
                  ctx->runtime.osr,
-                 ctx->runtime.mem_blocks,
-                 ctx->runtime.mem_block_size,
-                 ctx->runtime.smoke_bytes);
+                 ctx->runtime.flags,
+                 ctx->runtime.disable_memory_access,
+                 ctx->runtime.force_internal_timer,
+                 ctx->runtime.disable_internal_timer,
+                 ctx->runtime.force_fips,
+                 ctx->runtime.ntg1,
+                 ctx->runtime.cache_all,
+                 ctx->runtime.max_memsize_kb,
+                 ctx->runtime.hashloop,
+                 ctx->runtime.smoke_bytes,
+                 ctx->backend_init_success,
+                 ctx->backend_alloc_success,
+                 ctx->backend_smoke_success,
+                 ctx->backend_last_error);
     if (n < 0) {
         return CPUJITTER_ERR_IO;
     }

@@ -19,8 +19,9 @@ static profile_entry mk(const char *id,
     e.logical_cpu_min = 1;
     e.logical_cpu_max = 128;
     e.osr = 2;
-    e.mem_blocks = 64;
-    e.mem_block_size = 64;
+    e.hashloop = 1;
+    e.max_memsize_kb = 256;
+    e.flags = 0;
     e.smoke_bytes = 32;
     return e;
 }

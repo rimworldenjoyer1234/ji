@@ -73,8 +73,8 @@ static int test_init_and_bytes(void) {
     }
 
     err = cpujitter_get_runtime_config(ctx, &cfg);
-    if (err != CPUJITTER_OK || cfg.profile_id[0] == '\0') {
-        fprintf(stderr, "get_runtime_config failed\n");
+    if (err != CPUJITTER_OK || cfg.profile_id[0] == '\0' || cfg.osr <= 0 || cfg.hashloop <= 0 || cfg.max_memsize_kb <= 0) {
+        fprintf(stderr, "get_runtime_config failed or runtime controls invalid\n");
         cpujitter_shutdown(ctx);
         return 1;
     }

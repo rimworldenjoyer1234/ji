@@ -1,73 +1,112 @@
 #include "cpujitter_internal.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
-#if !defined(_WIN32)
-#include <unistd.h>
+#if defined(__has_include)
+#if __has_include("jitterentropy.h")
+#include "jitterentropy.h"
+#define CPUJITTER_HAS_JENT 1
+#endif
 #endif
 
-/*
- * TODO(jitterentropy-integration): replace this fallback backend with calls into
- * Stephan Mueller's jitterentropy-library through external/jitterentropy.
- */
-static int fill_from_urandom(unsigned char *out, size_t len) {
-#if defined(_WIN32)
-    (void)out;
-    (void)len;
-    return -1;
-#else
-    FILE *f = fopen("/dev/urandom", "rb");
-    if (!f) {
-        return -1;
-    }
-    if (fread(out, 1U, len, f) != len) {
-        fclose(f);
-        return -1;
-    }
-    fclose(f);
-    return 0;
+#ifndef CPUJITTER_HAS_JENT
+#define CPUJITTER_HAS_JENT 0
 #endif
-}
 
-static void fill_from_prng(unsigned char *out, size_t len) {
-    size_t i;
-    static int seeded = 0;
-    if (!seeded) {
-        seeded = 1;
-        srand((unsigned int)time(NULL));
-    }
-    for (i = 0; i < len; i++) {
-        out[i] = (unsigned char)(rand() & 0xFF);
-    }
-}
-
+#if CPUJITTER_HAS_JENT
 cpujitter_err cpujitter_backend_init(cpujitter_ctx *ctx, const profile_entry *profile) {
-    (void)profile;
-    if (!ctx) {
+    int r;
+    if (!ctx || !profile) {
         return CPUJITTER_ERR_INVALID_ARG;
     }
+
+    ctx->backend_last_error = 0;
+    ctx->backend_init_success = 0;
+    ctx->backend_alloc_success = 0;
+
+    r = jent_entropy_init_ex((unsigned int)profile->osr, (unsigned int)profile->flags);
+    if (r != 0) {
+        ctx->backend_last_error = r;
+        return CPUJITTER_ERR_ENTROPY_BACKEND;
+    }
+    ctx->backend_init_success = 1;
+
+    ctx->backend_collector = jent_entropy_collector_alloc((unsigned int)profile->osr,
+                                                          (unsigned int)profile->flags);
+    if (!ctx->backend_collector) {
+        ctx->backend_last_error = -2;
+        return CPUJITTER_ERR_ENTROPY_BACKEND;
+    }
+
+    ctx->backend_alloc_success = 1;
     ctx->backend_initialized = 1;
     return CPUJITTER_OK;
 }
 
 cpujitter_err cpujitter_backend_get_bytes(cpujitter_ctx *ctx, unsigned char *out, size_t len) {
+    ssize_t r;
     if (!ctx || !out) {
         return CPUJITTER_ERR_INVALID_ARG;
     }
-    if (!ctx->backend_initialized) {
+    if (!ctx->backend_initialized || !ctx->backend_collector) {
         return CPUJITTER_ERR_STATE;
     }
     if (len == 0) {
         return CPUJITTER_OK;
     }
 
-    if (fill_from_urandom(out, len) != 0) {
-        fill_from_prng(out, len);
+    r = jent_read_entropy((struct rand_data *)ctx->backend_collector, out, len);
+    if (r < 0 || (size_t)r != len) {
+        ctx->backend_last_error = (int)r;
+        return CPUJITTER_ERR_ENTROPY_BACKEND;
     }
+    return CPUJITTER_OK;
+}
 
+void cpujitter_backend_shutdown(cpujitter_ctx *ctx) {
+    if (!ctx) {
+        return;
+    }
+    if (ctx->backend_collector) {
+        jent_entropy_collector_free((struct rand_data *)ctx->backend_collector);
+    }
+    ctx->backend_collector = NULL;
+    ctx->backend_initialized = 0;
+}
+
+#else
+#if !defined(CPUJITTER_ENABLE_MOCK_BACKEND) || CPUJITTER_ENABLE_MOCK_BACKEND != 1
+#error "jitterentropy.h not found and CPUJITTER_ENABLE_MOCK_BACKEND is OFF. Provide vendored jitterentropy or enable explicit non-production mock backend."
+#endif
+
+#include <stdlib.h>
+#include <time.h>
+
+/* NON-PRODUCTION BACKEND: enabled only with CPUJITTER_ENABLE_MOCK_BACKEND=1 */
+cpujitter_err cpujitter_backend_init(cpujitter_ctx *ctx, const profile_entry *profile) {
+    (void)profile;
+    if (!ctx) {
+        return CPUJITTER_ERR_INVALID_ARG;
+    }
+    srand((unsigned int)time(NULL));
+    ctx->backend_init_success = 1;
+    ctx->backend_alloc_success = 1;
+    ctx->backend_initialized = 1;
+    return CPUJITTER_OK;
+}
+
+cpujitter_err cpujitter_backend_get_bytes(cpujitter_ctx *ctx, unsigned char *out, size_t len) {
+    size_t i;
+    if (!ctx || !out) {
+        return CPUJITTER_ERR_INVALID_ARG;
+    }
+    if (!ctx->backend_initialized) {
+        return CPUJITTER_ERR_STATE;
+    }
+    for (i = 0; i < len; i++) {
+        out[i] = (unsigned char)(rand() & 0xFF);
+    }
     return CPUJITTER_OK;
 }
 
@@ -76,3 +115,4 @@ void cpujitter_backend_shutdown(cpujitter_ctx *ctx) {
         ctx->backend_initialized = 0;
     }
 }
+#endif

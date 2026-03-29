@@ -5,6 +5,9 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+option(CPUJITTER_ENABLE_MOCK_BACKEND "Enable NON-PRODUCTION mock backend when jitterentropy is unavailable" ON)
+option(CPUJITTER_BUILD_PROBE "Run dice_app --probe after build" ON)
+
 add_library(cpujitter
     src/cpujitter.c
     src/platform_detect.c
@@ -21,7 +24,17 @@ target_include_directories(cpujitter
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-option(CPUJITTER_BUILD_PROBE "Run dice_app --probe after build" ON)
+if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/jitterentropy/jitterentropy.h")
+    message(STATUS "Using vendored jitterentropy headers from external/jitterentropy")
+    target_include_directories(cpujitter PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/external/jitterentropy)
+else()
+    if (CPUJITTER_ENABLE_MOCK_BACKEND)
+        message(WARNING "Building with NON-PRODUCTION mock backend (jitterentropy headers not found).")
+        target_compile_definitions(cpujitter PRIVATE CPUJITTER_ENABLE_MOCK_BACKEND=1)
+    else()
+        message(FATAL_ERROR "jitterentropy headers not found and CPUJITTER_ENABLE_MOCK_BACKEND=OFF")
+    endif()
+endif()
 
 add_executable(dice_app examples/dice_app.c)
 target_link_libraries(dice_app PRIVATE cpujitter m)

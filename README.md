@@ -38,10 +38,9 @@ Key API functions:
 - `src/entropy_backend.c`: backend adapter layer
 
 ### Backend integration model
-`src/entropy_backend.c` currently uses `/dev/urandom` fallback logic so the project builds without external dependencies.
+`src/entropy_backend.c` integrates with jitterentropy public API when `jitterentropy.h` is available (`jent_entropy_init_ex`, collector alloc/free, `jent_read_entropy`).
 
-Precise future integration point:
-- **TODO(jitterentropy-integration):** replace fallback backend with direct jitterentropy-library adapter in `external/jitterentropy`.
+If jitterentropy headers are missing, build can use an explicit **NON-PRODUCTION** mock backend (`CPUJITTER_ENABLE_MOCK_BACKEND=ON`) and emits a clear CMake warning.
 
 This keeps jitterentropy-specific details internal and out of public headers.
 
@@ -101,7 +100,8 @@ Top-level index object with:
 - `profiles` array of `{id, path}` entries
 
 Each per-profile file includes:
-- base fields: `id`, `os`, `arch`, `cpu_vendor`, `osr`, `mem_blocks`, `mem_block_size`, `smoke_bytes`
+- base fields: `id`, `os`, `arch`, `cpu_vendor`, `osr`, `smoke_bytes`
+- `runtime` fields: `disable_memory_access`, `force_internal_timer`, `disable_internal_timer`, `force_fips`, `ntg1`, `cache_all`, `max_memsize`, `hashloop`
 - optional `match` fields: `virtualization`, `cpu_model_exact`, `cpu_model_family`, `logical_cpu_min`, `logical_cpu_max`
 
 ## Cache format
@@ -134,3 +134,7 @@ Keep the cache file writable by the running process.
 ## Related internal tooling
 A separate qualification tooling repository is provided at `cpujitter-qualifier/`.
 It is intended for lab/CI profile generation and is not a runtime dependency of `libcpujitter`.
+
+
+## Recalibration strategy
+Runtime sweeps a small practical matrix: `osr=[3,4,6,8]`, `hashloop=[1,4,8]`, `max_memsize=[64,256,1024]` and timer strategies `(native, disable_internal_timer, force_internal_timer)`, preferring native + lower settings first.

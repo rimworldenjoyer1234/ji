@@ -100,15 +100,17 @@ static int write_probe_meta_file(const char *meta_path,
                 "profile_origin=%s\n"
                 "profile_id=%s\n"
                 "osr=%d\n"
-                "mem_blocks=%d\n"
-                "mem_block_size=%d\n"
+                "flags=%u\n"
+                "hashloop=%d\n"
+                "max_memsize=%d\n"
                 "smoke_bytes=%d\n"
                 "entropy_per_bit=%.6f\n",
                 source_label(cfg->source),
                 cfg->profile_id,
                 cfg->osr,
-                cfg->mem_blocks,
-                cfg->mem_block_size,
+                cfg->flags,
+                cfg->hashloop,
+                cfg->max_memsize_kb,
                 cfg->smoke_bytes,
                 entropy_per_bit) < 0) {
         fclose(f);
@@ -149,11 +151,12 @@ int main(int argc, char **argv) {
 
     if (cpujitter_get_runtime_config(ctx, &cfg) == CPUJITTER_OK) {
         printf("profile origin: %s\n", source_label(cfg.source));
-        printf("selected vars: profile=%s osr=%d mem_blocks=%d mem_block_size=%d smoke_bytes=%d\n",
+        printf("selected vars: profile=%s osr=%d flags=%u hashloop=%d max_memsize=%d smoke_bytes=%d\n",
                cfg.profile_id,
                cfg.osr,
-               cfg.mem_blocks,
-               cfg.mem_block_size,
+               cfg.flags,
+               cfg.hashloop,
+               cfg.max_memsize_kb,
                cfg.smoke_bytes);
     }
 
