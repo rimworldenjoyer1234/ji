@@ -21,8 +21,17 @@ target_include_directories(cpujitter
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+option(CPUJITTER_BUILD_PROBE "Run dice_app --probe after build" ON)
+
 add_executable(dice_app examples/dice_app.c)
-target_link_libraries(dice_app PRIVATE cpujitter)
+target_link_libraries(dice_app PRIVATE cpujitter m)
+
+if (CPUJITTER_BUILD_PROBE)
+    add_custom_command(TARGET dice_app POST_BUILD
+        COMMAND $<TARGET_FILE:dice_app> --probe
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "cpujitter probe: selected vars + estimated entropy per bit")
+endif()
 
 enable_testing()
 add_executable(cpujitter_tests tests/test_cpujitter.c)
