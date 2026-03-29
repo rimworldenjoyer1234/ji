@@ -28,9 +28,9 @@ target_link_libraries(dice_app PRIVATE cpujitter m)
 
 if (CPUJITTER_BUILD_PROBE)
     add_custom_command(TARGET dice_app POST_BUILD
-        COMMAND $<TARGET_FILE:dice_app> --probe
+        COMMAND $<TARGET_FILE:dice_app> --probe --dump ${CMAKE_BINARY_DIR}/cpujitter_probe_random.bin --meta ${CMAKE_BINARY_DIR}/cpujitter_probe_meta.txt
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "cpujitter probe: selected vars + estimated entropy per bit")
+        COMMENT "cpujitter probe: selected vars + estimated entropy per bit + random dump")
 endif()
 
 enable_testing()

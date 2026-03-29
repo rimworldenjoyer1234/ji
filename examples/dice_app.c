@@ -2,6 +2,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static const char *source_label(int source) {
@@ -46,6 +47,78 @@ static double estimate_entropy_per_bit(cpujitter_ctx *ctx) {
     return -(p1 * (log(p1) / log(2.0)) + p0 * (log(p0) / log(2.0)));
 }
 
+static int write_probe_random_file(cpujitter_ctx *ctx, const char *dump_path, size_t nbytes) {
+    unsigned char *buf;
+    FILE *f;
+
+    if (!ctx || !dump_path || nbytes == 0) {
+        return -1;
+    }
+
+    buf = (unsigned char *)malloc(nbytes);
+    if (!buf) {
+        return -1;
+    }
+
+    if (cpujitter_get_bytes(ctx, buf, nbytes) != CPUJITTER_OK) {
+        free(buf);
+        return -1;
+    }
+
+    f = fopen(dump_path, "wb");
+    if (!f) {
+        free(buf);
+        return -1;
+    }
+
+    if (fwrite(buf, 1U, nbytes, f) != nbytes) {
+        fclose(f);
+        free(buf);
+        return -1;
+    }
+
+    fclose(f);
+    free(buf);
+    return 0;
+}
+
+static int write_probe_meta_file(const char *meta_path,
+                                 const cpujitter_runtime_config *cfg,
+                                 double entropy_per_bit) {
+    FILE *f;
+
+    if (!meta_path || !cfg) {
+        return -1;
+    }
+
+    f = fopen(meta_path, "wb");
+    if (!f) {
+        return -1;
+    }
+
+    if (fprintf(f,
+                "profile_origin=%s\n"
+                "profile_id=%s\n"
+                "osr=%d\n"
+                "mem_blocks=%d\n"
+                "mem_block_size=%d\n"
+                "smoke_bytes=%d\n"
+                "entropy_per_bit=%.6f\n",
+                source_label(cfg->source),
+                cfg->profile_id,
+                cfg->osr,
+                cfg->mem_blocks,
+                cfg->mem_block_size,
+                cfg->smoke_bytes,
+                entropy_per_bit) < 0) {
+        fclose(f);
+        return -1;
+    }
+
+    fclose(f);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     cpujitter_ctx *ctx = NULL;
     cpujitter_runtime_config cfg;
@@ -53,8 +126,20 @@ int main(int argc, char **argv) {
     char status[512];
     size_t written = 0;
     double entropy_per_bit;
-    int probe_only = (argc > 1 && strcmp(argv[1], "--probe") == 0);
+    const char *dump_path = NULL;
+    const char *meta_path = NULL;
+    int probe_only = 0;
     int i;
+
+    for (i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--probe") == 0) {
+            probe_only = 1;
+        } else if (strcmp(argv[i], "--dump") == 0 && (i + 1) < argc) {
+            dump_path = argv[++i];
+        } else if (strcmp(argv[i], "--meta") == 0 && (i + 1) < argc) {
+            meta_path = argv[++i];
+        }
+    }
 
     err = cpujitter_init(&ctx, "profiles/index.json", "cache/local_profile.json");
     if (err != CPUJITTER_OK) {
@@ -79,6 +164,22 @@ int main(int argc, char **argv) {
 
     if (cpujitter_get_status_json(ctx, status, sizeof(status), &written) == CPUJITTER_OK && written > 0) {
         printf("status: %.160s\n", status);
+    }
+
+    if (probe_only && dump_path) {
+        if (write_probe_random_file(ctx, dump_path, 4096U) == 0) {
+            printf("probe random file: %s\n", dump_path);
+        } else {
+            fprintf(stderr, "failed writing probe random file: %s\n", dump_path);
+        }
+    }
+
+    if (probe_only && meta_path) {
+        if (write_probe_meta_file(meta_path, &cfg, entropy_per_bit) == 0) {
+            printf("probe metadata file: %s\n", meta_path);
+        } else {
+            fprintf(stderr, "failed writing probe metadata file: %s\n", meta_path);
+        }
     }
 
     if (!probe_only) {

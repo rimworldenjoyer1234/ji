@@ -86,6 +86,10 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+With `CPUJITTER_BUILD_PROBE=ON` (default), build also runs `dice_app --probe` and generates:
+- `build/cpujitter_probe_random.bin` (4096 random bytes)
+- `build/cpujitter_probe_meta.txt` (selected runtime vars + estimated entropy/bit)
+
 ## Run example
 ```bash
 ./build/dice_app
