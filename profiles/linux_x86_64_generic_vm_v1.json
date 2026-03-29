@@ -1,0 +1,16 @@
+{
+  "id": "linux-x86_64-generic-x86-vm-v1",
+  "os": "linux",
+  "arch": "x86_64",
+  "cpu_vendor": "generic-x86",
+  "match": {
+    "virtualization": "vm",
+    "cpu_model_family": "x86-*",
+    "logical_cpu_min": 1,
+    "logical_cpu_max": 256
+  },
+  "osr": 2,
+  "mem_blocks": 64,
+  "mem_block_size": 64,
+  "smoke_bytes": 32
+}
