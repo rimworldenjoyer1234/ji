@@ -109,3 +109,7 @@ Runtime writes a validated cache JSON (ignored by git by default), example templ
 4. Shutdown with `cpujitter_shutdown`.
 
 Keep the cache file writable by the running process.
+
+## Related internal tooling
+A separate qualification tooling repository is provided at `cpujitter-qualifier/`.
+It is intended for lab/CI profile generation and is not a runtime dependency of `libcpujitter`.
